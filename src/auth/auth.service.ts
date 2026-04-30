@@ -1,28 +1,29 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { User } from 'src/user/entities/user.entity';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { User } from '../user/entities/user.entity';
 @Injectable()
 export class AuthService {
-
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   async register(registerDto: RegisterDto, response: Response) {
     const existUser = await this.userRepository.findOne({
-      where: [
-        { email: registerDto.email },
-        { username: registerDto.username },
-      ],
+      where: [{ email: registerDto.email }, { username: registerDto.username }],
     });
 
     if (existUser) {
@@ -64,11 +65,10 @@ export class AuthService {
     };
   }
 
-
   async login(loginDto: LoginDto, response: Response) {
     const user = await this.userRepository.findOne({
-      where: { email: loginDto.email }
-    })
+      where: { email: loginDto.email },
+    });
 
     if (!user) {
       throw new ConflictException('Invalid credentials');
@@ -76,8 +76,8 @@ export class AuthService {
 
     const isValidPassword = await bcrypt.compare(
       loginDto.password,
-      user.password
-    )
+      user.password,
+    );
 
     if (!isValidPassword) {
       throw new UnauthorizedException('Invalid credentials');
@@ -86,7 +86,7 @@ export class AuthService {
     const payload = {
       sub: user.id,
       username: user.username,
-    }
+    };
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get('JWT_ACCESS_SECRET'),
@@ -97,7 +97,6 @@ export class AuthService {
       secret: this.configService.get('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
-
 
     this.setAuthCookies(response, accessToken, refreshToken);
 
@@ -111,7 +110,11 @@ export class AuthService {
     };
   }
 
-  private setAuthCookies(response: Response, accessToken: string, refreshToken: string) {
+  private setAuthCookies(
+    response: Response,
+    accessToken: string,
+    refreshToken: string,
+  ) {
     const isProd = this.configService.get('NODE_ENV') === 'production';
 
     response.cookie('access_token', accessToken, {

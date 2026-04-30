@@ -4,11 +4,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import * as dotenv from 'dotenv';
 import helmet from 'helmet';
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  dotenv.config();
+import csurf from 'csurf';
 
-  app.setGlobalPrefix('api');
+async function bootstrap() {
+  dotenv.config();
+  const app = await NestFactory.create(AppModule);
 
   const config = new DocumentBuilder()
     .setTitle('Cats example')
@@ -18,12 +18,26 @@ async function bootstrap() {
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
-  app.use(helmet());
-  app.enableCors();
-  app.use(cookieParser());
 
+  app.use(cookieParser());
+  app.use(
+    csurf({
+      cookie: {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    }),
+  );
+  app.use(helmet());
+
+  app.enableCors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true,
+  });
+
+  app.setGlobalPrefix('api');
 
   await app.listen(process.env.PORT ?? 3000);
-
 }
 bootstrap();
