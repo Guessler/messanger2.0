@@ -2,6 +2,7 @@ import { Controller, Post, Body, Res, Get, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/auth.dto';
 import type { Request, Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -13,6 +14,7 @@ export class AuthController {
   }
 
   @Post('/register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   register(
     @Body() createAuthDto: RegisterDto,
     @Res({ passthrough: true }) response: Response,
@@ -21,6 +23,7 @@ export class AuthController {
   }
 
   @Post('/login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   login(
     @Body() createAuthDto: RegisterDto,
     @Res({ passthrough: true }) response: Response,
