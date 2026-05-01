@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../user/entities/user.entity';
+import { JwtPayload } from 'src/shared/jwt-payload';
 @Injectable()
 export class AuthService {
   constructor(
@@ -45,12 +46,12 @@ export class AuthService {
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get('JWT_ACCESS_SECRET'),
+      secret: process.env.JWT_ACCESS_SECRET,
       expiresIn: '15m',
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get('JWT_REFRESH_SECRET'),
+      secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: '7d',
     });
     this.setAuthCookies(response, accessToken, refreshToken);
@@ -89,12 +90,12 @@ export class AuthService {
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get('JWT_ACCESS_SECRET'),
+      secret: process.env.JWT_ACCESS_SECRET,
       expiresIn: '15m',
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get('JWT_REFRESH_SECRET'),
+      secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: '7d',
     });
 
@@ -109,6 +110,114 @@ export class AuthService {
       user: userWithoutSensitive,
     };
   }
+
+  async me(authHeader: string) {
+    const token = authHeader?.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException();
+    }
+
+    const payload = this.jwtService.verify<JwtPayload>(token, {
+      secret: process.env.JWT_ACCESS_SECRET,
+    });
+
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+    };
+  }
+
+  async changePassword(token: string, response: Response) {}
+
+  async refresh(token: string, response: Response) {
+    if (!token) {
+      throw new UnauthorizedException();
+    }
+
+    const payload = this.jwtService.verify<JwtPayload>(token, {
+      secret: process.env.JWT_REFRESH_SECRET,
+    });
+
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    if (token !== user.refreshToken) {
+      throw new UnauthorizedException();
+    }
+
+    const payloadData = { sub: user.id, username: user.username };
+
+    const accessToken = await this.jwtService.signAsync(payloadData, {
+      secret: process.env.JWT_ACCESS_SECRET,
+      expiresIn: '15m',
+    });
+
+    const newRefreshToken = await this.jwtService.signAsync(payloadData, {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: '7d',
+    });
+    this.setAuthCookies(response, accessToken, newRefreshToken);
+
+    user.refreshToken = newRefreshToken;
+    await this.userRepository.save(user);
+
+    return { success: true };
+  }
+
+  async logout(authHeader: string, res: Response) {
+    const token = authHeader.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException();
+    }
+
+    const payload = this.jwtService.verify<JwtPayload>(token, {
+      secret: process.env.JWT_ACCESS_SECRET,
+    });
+
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    user.refreshToken = null;
+    await this.userRepository.save(user);
+
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'lax',
+    });
+
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'lax',
+    });
+
+    return { success: true };
+  }
+
+  async logoutAll(token: string, response: Response) {}
 
   private setAuthCookies(
     response: Response,
