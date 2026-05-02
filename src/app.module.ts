@@ -6,7 +6,8 @@ import { User } from './user/entities/user.entity';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-
+import { S3Module } from './s3/s3.module';
+import 'multer';
 @Module({
   imports: [
     ThrottlerModule.forRoot({
@@ -19,6 +20,16 @@ import { APP_GUARD } from '@nestjs/core';
     }),
     ConfigModule.forRoot({
       envFilePath: '.env',
+      load: [
+        () => ({
+          aws: {
+            region: process.env.AWS_REGION,
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            s3BucketName: process.env.AWS_S3_BUCKET_NAME,
+          },
+        }),
+      ],
       isGlobal: true,
     }),
     TypeOrmModule.forRoot({
@@ -34,6 +45,7 @@ import { APP_GUARD } from '@nestjs/core';
     }),
     UserModule,
     AuthModule,
+    S3Module,
   ],
   providers: [
     {

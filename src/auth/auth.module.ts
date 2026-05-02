@@ -5,6 +5,7 @@ import { User } from '../user/entities/user.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
+import { S3Module } from '../s3/s3.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ConfigModule } from '@nestjs/config';
         expiresIn: '15m',
       },
     }),
+    S3Module,
   ],
   controllers: [AuthController],
   providers: [AuthService],

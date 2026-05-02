@@ -1,9 +1,20 @@
-import { Controller, Post, Body, Res, Get, Req, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Res,
+  Get,
+  Req,
+  Patch,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/auth.dto';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { UpdateAuthDto } from './dto/update-auth.dto';
+import { FileInterceptor } from '@nestjs/platform-express/multer';
 
 @Controller('auth')
 export class AuthController {
@@ -17,11 +28,13 @@ export class AuthController {
 
   @Post('/register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @UseInterceptors(FileInterceptor('avatar'))
   register(
     @Body() createAuthDto: RegisterDto,
     @Res({ passthrough: true }) response: Response,
+    @UploadedFile() file: Express.Multer.File | undefined,
   ) {
-    return this.authService.register(createAuthDto, response);
+    return this.authService.register(createAuthDto, file, response);
   }
 
   @Post('/login')

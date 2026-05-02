@@ -14,6 +14,8 @@ import { ConfigService } from '@nestjs/config';
 import { User } from '../user/entities/user.entity';
 import { JwtPayload } from 'src/shared/jwt-payload';
 import { UpdateAuthDto } from './dto/update-auth.dto';
+import { S3Service } from 'src/s3/s3.service';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -21,9 +23,14 @@ export class AuthService {
     private userRepository: Repository<User>,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private s3Service: S3Service,
   ) {}
 
-  async register(registerDto: RegisterDto, response: Response) {
+  async register(
+    registerDto: RegisterDto,
+    file: Express.Multer.File | undefined,
+    response: Response,
+  ) {
     const existUser = await this.userRepository.findOne({
       where: [{ email: registerDto.email }, { username: registerDto.username }],
     });
@@ -41,6 +48,17 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
 
+    let avatarKey: string | null = null;
+
+    if (file) {
+      avatarKey = `avatars/${savedUser.id}`;
+
+      await this.s3Service.uploadAvatar(avatarKey, file.buffer, file.mimetype);
+
+      savedUser.avatarKey = avatarKey;
+      await this.userRepository.save(savedUser);
+    }
+
     const payload = {
       sub: savedUser.id,
       username: savedUser.username,
@@ -55,6 +73,7 @@ export class AuthService {
       secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: '7d',
     });
+
     this.setAuthCookies(response, accessToken, refreshToken);
 
     savedUser.refreshToken = refreshToken;

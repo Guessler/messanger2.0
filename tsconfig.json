@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["node", "express"],
     "module": "nodenext",
     "strictPropertyInitialization": false,
     "moduleResolution": "nodenext",

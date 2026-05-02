@@ -26,8 +26,8 @@ export class User {
   @Column({ type: 'text', nullable: true })
   refreshToken: string | null;
 
-  @Column({ type: 'text', nullable: true })
-  avatarImage?: string;
+  @Column({ nullable: true })
+  avatarKey?: string;
 
   @Column({ type: 'timestamp', nullable: true })
   tokenExpires: Date | null;
