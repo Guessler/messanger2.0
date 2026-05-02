@@ -1,17 +1,9 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Res,
-  Get,
-  Req,
-  Headers,
-  Put,
-} from '@nestjs/common';
+import { Controller, Post, Body, Res, Get, Req, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/auth.dto';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
+import { UpdateAuthDto } from './dto/update-auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -42,32 +34,26 @@ export class AuthController {
   }
 
   @Get('/me')
-  me(@Headers('authorization') authHeader: string) {
-    return this.authService.me(authHeader);
+  me(@Req() req: Request) {
+    return this.authService.me(req.cookies?.access_token);
   }
 
-  @Put('/change-password')
+  @Patch('/change-password')
   changePassword(
+    @Req() req: Request,
+    @Body() dto: UpdateAuthDto,
     @Res({ passthrough: true }) response: Response,
-    @Headers('authorization') authHeader: string,
   ) {
-    return this.authService.changePassword(authHeader, response);
+    return this.authService.changePassword(
+      req.cookies?.access_token,
+      dto,
+      response,
+    );
   }
 
   @Post('/logout')
-  logout(
-    @Res({ passthrough: true }) response: Response,
-    @Headers('authorization') authHeader: string,
-  ) {
-    return this.authService.logout(authHeader, response);
-  }
-
-  @Post('/logout-all')
-  logoutAll(
-    @Res({ passthrough: true }) response: Response,
-    @Headers('authorization') authHeader: string,
-  ) {
-    return this.authService.logoutAll(authHeader, response);
+  logout(@Req() req: Request, @Res({ passthrough: true }) response: Response) {
+    return this.authService.logout(req.cookies?.access_token, response);
   }
 
   @Post('/refresh')

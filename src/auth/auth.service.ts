@@ -13,6 +13,7 @@ import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../user/entities/user.entity';
 import { JwtPayload } from 'src/shared/jwt-payload';
+import { UpdateAuthDto } from './dto/update-auth.dto';
 @Injectable()
 export class AuthService {
   constructor(
@@ -111,14 +112,12 @@ export class AuthService {
     };
   }
 
-  async me(authHeader: string) {
-    const token = authHeader?.split(' ')[1];
-
-    if (!token) {
+  async me(access_token: string) {
+    if (!access_token) {
       throw new UnauthorizedException();
     }
 
-    const payload = this.jwtService.verify<JwtPayload>(token, {
+    const payload = this.jwtService.verify<JwtPayload>(access_token, {
       secret: process.env.JWT_ACCESS_SECRET,
     });
 
@@ -138,7 +137,60 @@ export class AuthService {
     };
   }
 
-  async changePassword(token: string, response: Response) {}
+  async changePassword(
+    access_token: string,
+    dto: UpdateAuthDto,
+    res: Response,
+  ) {
+    if (!access_token) {
+      throw new UnauthorizedException();
+    }
+
+    const payload = this.jwtService.verify<JwtPayload>(access_token, {
+      secret: process.env.JWT_ACCESS_SECRET,
+    });
+
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    const isValid = await bcrypt.compare(dto.oldPassword, user.password);
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid current password');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 7);
+
+    user.password = hashedPassword;
+
+    user.refreshToken = null;
+
+    await this.userRepository.save(user);
+
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'lax',
+    });
+
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'lax',
+    });
+
+    return {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+    };
+  }
 
   async refresh(token: string, response: Response) {
     if (!token) {
@@ -180,14 +232,12 @@ export class AuthService {
     return { success: true };
   }
 
-  async logout(authHeader: string, res: Response) {
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
+  async logout(access_token: string, res: Response) {
+    if (!access_token) {
       throw new UnauthorizedException();
     }
 
-    const payload = this.jwtService.verify<JwtPayload>(token, {
+    const payload = this.jwtService.verify<JwtPayload>(access_token, {
       secret: process.env.JWT_ACCESS_SECRET,
     });
 
@@ -216,8 +266,6 @@ export class AuthService {
 
     return { success: true };
   }
-
-  async logoutAll(token: string, response: Response) {}
 
   private setAuthCookies(
     response: Response,
