@@ -15,6 +15,7 @@ import { User } from '../user/entities/user.entity';
 import { JwtPayload } from 'src/shared/jwt-payload';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import { S3Service } from 'src/s3/s3.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
@@ -28,11 +29,11 @@ export class AuthService {
 
   async register(
     registerDto: RegisterDto,
-    file: Express.Multer.File | undefined,
+    // file: Express.Multer.File | undefined,
     response: Response,
   ) {
     const existUser = await this.userRepository.findOne({
-      where: [{ email: registerDto.email }, { username: registerDto.username }],
+      where: { email: registerDto.email },
     });
 
     if (existUser) {
@@ -44,20 +45,22 @@ export class AuthService {
     const user = this.userRepository.create({
       ...registerDto,
       password: hashedPassword,
+      name: 'Anonymous',
+      username: `user_${uuidv4()}`,
     });
 
     const savedUser = await this.userRepository.save(user);
 
-    let avatarKey: string | null = null;
+    // let avatarKey: string | null = null;
 
-    if (file) {
-      avatarKey = `avatars/${savedUser.id}`;
+    // if (file) {
+    //   avatarKey = `avatars/${savedUser.id}`;
 
-      await this.s3Service.uploadAvatar(avatarKey, file.buffer, file.mimetype);
+    //   await this.s3Service.uploadAvatar(avatarKey, file.buffer, file.mimetype);
 
-      savedUser.avatarKey = avatarKey;
-      await this.userRepository.save(savedUser);
-    }
+    //   savedUser.avatarKey = avatarKey;
+    //   await this.userRepository.save(savedUser);
+    // }
 
     const payload = {
       sub: savedUser.id,
