@@ -17,6 +17,14 @@ import { UpdateAuthDto } from './dto/update-auth.dto';
 import { S3Service } from 'src/s3/s3.service';
 import { v4 as uuidv4 } from 'uuid';
 
+export interface OAuthProfile {
+  email: string;
+  name?: string;
+  avatar?: string;
+  provider: string;
+  providerId: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -27,11 +35,7 @@ export class AuthService {
     private s3Service: S3Service,
   ) {}
 
-  async register(
-    registerDto: RegisterDto,
-    // file: Express.Multer.File | undefined,
-    response: Response,
-  ) {
+  async register(registerDto: RegisterDto, response: Response) {
     const existUser = await this.userRepository.findOne({
       where: { email: registerDto.email },
     });
@@ -51,29 +55,18 @@ export class AuthService {
 
     const savedUser = await this.userRepository.save(user);
 
-    // let avatarKey: string | null = null;
-
-    // if (file) {
-    //   avatarKey = `avatars/${savedUser.id}`;
-
-    //   await this.s3Service.uploadAvatar(avatarKey, file.buffer, file.mimetype);
-
-    //   savedUser.avatarKey = avatarKey;
-    //   await this.userRepository.save(savedUser);
-    // }
-
     const payload = {
       sub: savedUser.id,
       username: savedUser.username,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: '15m',
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET,
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
 
@@ -98,6 +91,10 @@ export class AuthService {
       throw new ConflictException('Invalid credentials');
     }
 
+    if (user.password === null) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const isValidPassword = await bcrypt.compare(
       loginDto.password,
       user.password,
@@ -113,12 +110,12 @@ export class AuthService {
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: '15m',
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET,
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
 
@@ -134,13 +131,62 @@ export class AuthService {
     };
   }
 
+  async handleOAuthLogin(profile: OAuthProfile, response: Response) {
+    const { email, name, avatar, provider, providerId } = profile;
+
+    if (!email) {
+      throw new Error('OAuth provider did not return email');
+    }
+
+    let user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      user = this.userRepository.create({
+        email,
+        name: name || 'Anonymous',
+        username: `user_${uuidv4()}`,
+        avatar,
+        provider,
+        providerId,
+        password: null,
+      });
+
+      user = await this.userRepository.save(user);
+    }
+
+    const payload = {
+      sub: user.id,
+      username: user.username,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+      expiresIn: '15m',
+    });
+
+    const refreshToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: '7d',
+    });
+
+    this.setAuthCookies(response, accessToken, refreshToken);
+
+    user.refreshToken = refreshToken;
+    await this.userRepository.save(user);
+
+    const { password, refreshToken: _, ...safeUser } = user;
+
+    return { user: safeUser };
+  }
   async me(access_token: string) {
     if (!access_token) {
       throw new UnauthorizedException();
     }
 
     const payload = this.jwtService.verify<JwtPayload>(access_token, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
     });
 
     const user = await this.userRepository.findOne({
@@ -169,7 +215,7 @@ export class AuthService {
     }
 
     const payload = this.jwtService.verify<JwtPayload>(access_token, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
     });
 
     const user = await this.userRepository.findOne({
@@ -178,6 +224,10 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException();
+    }
+
+    if (user.password === null) {
+      throw new UnauthorizedException('No password set for this account');
     }
 
     const isValid = await bcrypt.compare(dto.oldPassword, user.password);
@@ -220,7 +270,7 @@ export class AuthService {
     }
 
     const payload = this.jwtService.verify<JwtPayload>(token, {
-      secret: process.env.JWT_REFRESH_SECRET,
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
     });
 
     const user = await this.userRepository.findOne({
@@ -238,12 +288,12 @@ export class AuthService {
     const payloadData = { sub: user.id, username: user.username };
 
     const accessToken = await this.jwtService.signAsync(payloadData, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       expiresIn: '15m',
     });
 
     const newRefreshToken = await this.jwtService.signAsync(payloadData, {
-      secret: process.env.JWT_REFRESH_SECRET,
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
     this.setAuthCookies(response, accessToken, newRefreshToken);
@@ -260,7 +310,7 @@ export class AuthService {
     }
 
     const payload = this.jwtService.verify<JwtPayload>(access_token, {
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: process.env.JWT_ACCESS_SECRET!,
     });
 
     const user = await this.userRepository.findOne({

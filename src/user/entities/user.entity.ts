@@ -20,14 +20,20 @@ export class User {
   @Column({ unique: true })
   username: string;
 
-  @Column()
-  password: string;
+  @Column({ type: 'text', nullable: true })
+  password: string | null;
 
   @Column({ type: 'text', nullable: true })
   refreshToken: string | null;
 
   @Column({ nullable: true })
-  avatarKey?: string;
+  avatar?: string;
+
+  @Column({ nullable: true })
+  provider?: string;
+
+  @Column({ nullable: true })
+  providerId?: string;
 
   @Column({ type: 'timestamp', nullable: true })
   tokenExpires: Date | null;
