@@ -1,9 +1,21 @@
-import { Controller, Post, Body, Res, Get, Req, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Res,
+  Get,
+  Req,
+  Patch,
+  UseGuards,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto } from './dto/auth.dto';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { UpdateAuthDto } from './dto/update-auth.dto';
+import { AuthGuard } from '@nestjs/passport';
+import type { OAuthProfile } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
@@ -29,10 +41,27 @@ export class AuthController {
   @Post('/login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   login(
-    @Body() createAuthDto: RegisterDto,
+    @Body() createAuthDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.authService.login(createAuthDto, response);
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {}
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const user = req.user as OAuthProfile | null;
+    if (!user) {
+      throw new UnauthorizedException('OAuth authentication failed');
+    }
+    return this.authService.handleOAuthLogin(user, res);
   }
 
   @Get('/me')

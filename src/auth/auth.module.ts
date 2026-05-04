@@ -4,15 +4,16 @@ import { AuthController } from './auth.controller';
 import { User } from '../user/entities/user.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule } from '@nestjs/config';
 import { S3Module } from '../s3/s3.module';
+import { GoogleStrategy } from './oauth.strategy';
+import { PassportModule } from '@nestjs/passport';
 
 @Module({
   imports: [
+    PassportModule,
     TypeOrmModule.forFeature([User]),
-    ConfigModule,
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: process.env.JWT_ACCESS_SECRET!,
       signOptions: {
         expiresIn: '15m',
       },
@@ -20,6 +21,6 @@ import { S3Module } from '../s3/s3.module';
     S3Module,
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, GoogleStrategy],
 })
 export class AuthModule {}
