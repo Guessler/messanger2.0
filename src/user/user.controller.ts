@@ -1,42 +1,24 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Req } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import type { Request } from 'express';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
+  @Get('profile')
+  profile(@Req() req: Request) {
+    return this.userService.profile(req?.cookies.access_token);
   }
 
-  @Get()
-  findAll() {
-    return this.userService.findAll();
+  @Patch('profile')
+  async updateProfile(@Req() req: Request, @Body() dto: UpdateUserDto) {
+    return this.userService.updateProfile(req?.cookies.access_token, dto);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(+id, updateUserDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+  @Delete('delete-account')
+  async deleteAccount(@Req() req: Request) {
+    return this.userService.deleteAccount(req?.cookies.access_token);
   }
 }

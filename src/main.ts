@@ -10,16 +10,10 @@ async function bootstrap() {
   dotenv.config();
   const app = await NestFactory.create(AppModule);
 
-  const config = new DocumentBuilder()
-    .setTitle('Cats example')
-    .setDescription('The cats API description')
-    .setVersion('1.0')
-    .addTag('cats')
-    .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory);
+  app.use(helmet());
 
   app.use(cookieParser());
+
   app.use(
     csurf({
       cookie: {
@@ -29,12 +23,21 @@ async function bootstrap() {
       },
     }),
   );
-  app.use(helmet());
 
   app.enableCors({
     origin: process.env.CLIENT_URL || 'http://localhost:3001',
     credentials: true,
   });
+
+  const config = new DocumentBuilder()
+    .setTitle('Chat')
+    .setDescription('chat description')
+    .setVersion('1.0')
+    .addTag('chat')
+    .build();
+
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, documentFactory);
 
   app.setGlobalPrefix('api');
 

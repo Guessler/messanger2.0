@@ -29,11 +29,9 @@ export class AuthController {
 
   @Post('/register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  // @UseInterceptors(FileInterceptor('avatar'))
   register(
     @Body() createAuthDto: RegisterDto,
     @Res({ passthrough: true }) response: Response,
-    // @UploadedFile() file: Express.Multer.File | undefined,
   ) {
     return this.authService.register(createAuthDto, response);
   }
@@ -61,7 +59,8 @@ export class AuthController {
     if (!user) {
       throw new UnauthorizedException('OAuth authentication failed');
     }
-    return this.authService.handleOAuthLogin(user, res);
+    await this.authService.handleOAuthLogin(user, res);
+    return res.redirect(`${process.env.CLIENT_URL}/profile`);
   }
 
   @Get('/me')
