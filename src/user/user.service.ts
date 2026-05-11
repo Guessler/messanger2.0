@@ -46,9 +46,7 @@ export class UserService {
   }
 
   async updateProfile(token: string, dto: UpdateUserDto) {
-    if (!token) {
-      throw new UnauthorizedException();
-    }
+    if (!token) throw new UnauthorizedException();
 
     const payload = this.jwtService.verify<JwtPayload>(token, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
@@ -58,19 +56,12 @@ export class UserService {
       where: { id: payload.sub },
     });
 
-    if (!user) {
-      throw new UnauthorizedException();
-    }
+    if (!user) throw new UnauthorizedException();
 
-    await this.userRepository.update(
-      { id: user.id },
-      {
-        name: dto.name ?? user.name,
-        username: dto.username ?? user.username,
-        avatar: dto.avatar ?? user.avatar,
-      },
-    );
+    if (dto.name !== undefined) user.name = dto.name;
+    if (dto.username !== undefined) user.username = dto.username;
 
+    await this.userRepository.save(user);
     return { success: 'ok' };
   }
 

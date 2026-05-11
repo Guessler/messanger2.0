@@ -2,12 +2,14 @@ import { Body, Controller, Delete, Get, Patch, Req } from '@nestjs/common';
 import { UserService } from './user.service';
 import type { Request } from 'express';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('profile')
+  @SkipThrottle()
   profile(@Req() req: Request) {
     return this.userService.profile(req?.cookies.access_token);
   }

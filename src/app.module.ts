@@ -14,7 +14,7 @@ import 'multer';
       throttlers: [
         {
           ttl: 60000,
-          limit: 10,
+          limit: process.env.NODE_ENV === 'production' ? 60 : 600,
         },
       ],
     }),
